@@ -1,30 +1,56 @@
 import sys
 import csv
+import os
 import configparser
+from tkinter import filedialog
+from tkinter import messagebox
+import tkinter as tk
 
+# Get rid of the root TK window, we don't need it.
+root = tk.Tk()
+root.withdraw()
+
+# Utility function to replace strings in the csv from the replacements.config file.
 def replace_strings(dict, replacementSection, columnName):
     if dict[columnName].lower() in configParser[replacementSection].keys():
         dict[columnName]=configParser[replacementSection][dict[columnName].lower()]
 
+# Get our input
+GUI=False
 if len(sys.argv) < 2:
-    print('You must pass the csv export file to this program.')
-    sys.exit()
+    GUI=True
+    FILE=filedialog.askopenfilename(title="Select your TCGPlayer app export file",filetypes=[("TCGPlayer exports", ".csv"),("All files","*.*")])
+    if len(FILE) == 0:
+        messagebox.showerror(title="Input file not provided",message="You must pass the TCGPlayer csv export file to this program.")
+        sys.exit()
+else:
+    FILE=sys.argv[1]
 
-FILE=sys.argv[1]
+skipcolumns=["Simple Name","Set Code","Rarity","Product ID","SKU","Price","Price Each"]
+outputFile="deckbox_import.csv"
 
-skipcolumns=['Simple Name','Set Code','Rarity','Product ID','SKU','Price','Price Each']
+configParser = configparser.ConfigParser(delimiters="=")
+configParser.read("replacements.config")
 
+with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as deckboxcsvfile:
 
-configParser = configparser.ConfigParser(delimiters='=')
-configParser.read('replacements.config')
-
-with open(FILE, newline='') as tcgcsvfile,open('deckbox_import.csv', 'w', newline='') as deckboxcsvfile:
+    try:
+        csv.Sniffer().sniff(tcgcsvfile.read(4096),delimiters=",")
+        tcgcsvfile.seek(0)
+    except:
+        if GUI:
+            messagebox.showerror(title="Invalid input file",message="The file selected does not appear to be a valid CSV file.")
+        else:
+            print("The file passed does not appear to be a valid CSV file.")
+        sys.exit()
+        
     csvreader = csv.DictReader(tcgcsvfile)
+    
     # Adjust column names
     headerstcg = csvreader.fieldnames
     for index, header in enumerate(headerstcg):
-        if header.lower() in configParser['COLUMNS'].keys():
-            headerstcg[index]=configParser['COLUMNS'][header.lower()]
+        if header.lower() in configParser["COLUMNS"].keys():
+            headerstcg[index]=configParser["COLUMNS"][header.lower()]
 
     # Unnecessary Columns: Simple Name,Set Code,Printing,Rarity,Product ID,SKU,Price,Price Each.
     headersdeckbox=[x for x in headerstcg if x not in skipcolumns]
@@ -37,22 +63,29 @@ with open(FILE, newline='') as tcgcsvfile,open('deckbox_import.csv', 'w', newlin
             row.pop(skippable)
 
         # Map the printing column to the Foil column
-        if row['Foil'] == 'Normal':
-            row['Foil']=''
+        if row["Foil"] == "Normal":
+            row["Foil"]=""
 
         # Map Card Condition
-        replace_strings(row, 'CONDITIONS', 'Condition')
+        replace_strings(row, "CONDITIONS", "Condition")
 
         # Map Chinese Languages
-        replace_strings(row, 'LANGUAGES', 'Language')
+        replace_strings(row, "LANGUAGES", "Language")
 
         # Map Specific Card Names, and drop extras in parenthesis
-        row['Name']=row['Name'].replace(" (Extended Art)","")
-        row['Name']=row['Name'].replace(" (Showcase)","")
-        replace_strings(row, 'NAMES', 'Name')
+        row["Name"]=row["Name"].replace(" (Extended Art)","")
+        row["Name"]=row["Name"].replace(" (Showcase)","")
+        replace_strings(row, "NAMES", "Name")
 
         # Map Specific Edition Names
-        replace_strings(row, 'EDITONS', 'Edition')
+        replace_strings(row, "EDITONS", "Edition")
 
         # write the converted output
         csvwriter.writerow(row)
+
+# All Done!
+successMsg="Your import file for deckbox.org is available here: %s" % os.path.abspath(outputFile)
+if GUI:
+    messagebox.showinfo(title="Conversion completed successfully!", message=successMsg)
+else:
+    print(successMsg)

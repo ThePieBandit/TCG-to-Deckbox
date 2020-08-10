@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['tcg-to-deckbox.py'],
-             pathex=['.'],
+             pathex=['/home/runner/work/TCG-to-Deckbox/TCG-to-Deckbox'],
              binaries=[],
              datas=[('replacements.config', '.')],
              hiddenimports=[],

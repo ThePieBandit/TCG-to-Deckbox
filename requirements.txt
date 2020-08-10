@@ -52,5 +52,5 @@ systemd-python==234
 ubuntu-drivers-common==0.0.0
 ufw==0.36
 unattended-upgrades==0.1
-urllib3==1.24.1
+urllib3==1.24.2
 xkit==0.0.0

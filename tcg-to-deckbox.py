@@ -2,6 +2,7 @@ import sys
 import csv
 import os
 import configparser
+import re
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter as tk
@@ -43,9 +44,9 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
         else:
             print("The file passed does not appear to be a valid CSV file.")
         sys.exit()
-        
+
     csvreader = csv.DictReader(tcgcsvfile)
-    
+
     # Adjust column names
     headerstcg = csvreader.fieldnames
     for index, header in enumerate(headerstcg):
@@ -60,7 +61,7 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
     for row in csvreader:
         # Don't bother with columns that are going to be ignored anyways
         for skippable in skipcolumns:
-            row.pop(skippable)
+            row.pop(skippable,'')
 
         # Map the printing column to the Foil column
         if row["Foil"] == "Normal":
@@ -72,9 +73,16 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
         # Map Chinese Languages
         replace_strings(row, "LANGUAGES", "Language")
 
-        # Map Specific Card Names, and drop extras in parenthesis
+        # Map Specific Card Names, and drop extra tidbits
+        row["Name"]=row["Name"].replace(" (Alternate Art)","")
         row["Name"]=row["Name"].replace(" (Extended Art)","")
         row["Name"]=row["Name"].replace(" (Showcase)","")
+        row["Name"]=row["Name"].replace(" (Borderless)","")
+        #For BFZ lands...there's no differentiator from the full arts and the non full arts.
+        row["Name"]=row["Name"].replace(" - Full Art","")
+
+        # Remove numbers, mostly for lands, but for some other special cases (M21 Teferi)
+        row["Name"] = re.sub(r" \(\d+\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
 
         # Map Specific Edition Names

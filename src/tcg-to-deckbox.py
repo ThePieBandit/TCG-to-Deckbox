@@ -15,6 +15,16 @@ root.withdraw()
 def replace_strings(dict, replacementSection, columnName):
     if dict[columnName].lower() in configParser[replacementSection].keys():
         dict[columnName]=configParser[replacementSection][dict[columnName].lower()]
+        
+def getPathPrefix():
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        prefix = sys._MEIPASS
+    except Exception:
+        # else, use current directory
+        prefix = os.path.abspath(".")
+    return prefix
+
 
 # Get our input
 GUI=False
@@ -31,7 +41,7 @@ skipcolumns=["Simple Name","Set Code","Rarity","Product ID","SKU","Price","Price
 outputFile="deckbox_import.csv"
 
 configParser = configparser.ConfigParser(delimiters="=")
-configParser.read("replacements.config")
+configParser.read(os.path.join(getPathPrefix(),"replacements.config"))
 
 with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as deckboxcsvfile:
 

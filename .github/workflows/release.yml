@@ -25,17 +25,22 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
       
-    - name: PyInstaller Linux
+    - name: Build Linux Executable
       uses: JackMcKew/pyinstaller-action-linux@tkinter
       with:
         path: src
         tkinter: true
-        
-    - name: chmod distribution
-      run: chmod +x src/dist/linux/*
-
-    - uses: actions/upload-artifact@v2
+    - name: Upload Linux Executable
+      uses: actions/upload-artifact@v2
       with:
         name: tcg-to-deckbox
         path: src/dist/linux
-
+    - name: Build Windows Executable
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: src
+    - name: Upload Windows Executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: tcg-to-deckbox
+        path: src/dist/windows

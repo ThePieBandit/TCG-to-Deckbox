@@ -15,7 +15,7 @@ root.withdraw()
 def replace_strings(dict, replacementSection, columnName):
     if dict[columnName].lower() in configParser[replacementSection].keys():
         dict[columnName]=configParser[replacementSection][dict[columnName].lower()]
-        
+
 def getPathPrefix():
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
@@ -91,9 +91,18 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
         #For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"]=row["Name"].replace(" - Full Art","")
 
+        #Very specifc conditons
+        if row["Name"].contains("(JP Alternate Art)") and row["Edition"] == "War of the Spark":
+            row["Edition"] = "War of the Spark Japanese Alternate Art"
+            row["Name"]=row["Name"].replace(" (JP Alternate Art)","")
+
+
         # Remove numbers, mostly for lands, but for some other special cases (M21 Teferi)
         row["Name"] = re.sub(r" \(\d+\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
+
+        # remove weird symbols from card numbers
+        row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])
 
         # Map Specific Edition Names
         replace_strings(row, "EDITONS", "Edition")

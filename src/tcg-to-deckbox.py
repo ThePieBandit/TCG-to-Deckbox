@@ -92,7 +92,7 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
         row["Name"]=row["Name"].replace(" - Full Art","")
 
         #Very specifc conditons
-        if row["Name"].contains("(JP Alternate Art)") and row["Edition"] == "War of the Spark":
+        if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
             row["Edition"] = "War of the Spark Japanese Alternate Art"
             row["Name"]=row["Name"].replace(" (JP Alternate Art)","")
 

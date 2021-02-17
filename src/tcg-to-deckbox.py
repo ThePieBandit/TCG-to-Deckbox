@@ -1,15 +1,37 @@
 import sys
 import csv
-import os
+import time
+import os, os.path
 import configparser
 import re
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter as tk
+import urllib.request, json 
+
+
+# Constants
+MULTI_NAMES_FILE = "multiple_names.json"
+SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1"
+
+#global vars
+scryfall_data={}
+
+
 
 # Get rid of the root TK window, we don't need it.
 root = tk.Tk()
 root.withdraw()
+
+def fetch_multiple_names(uri,page=1):
+    print('Begin: Download %s, page %s of results' % (uri, page) )
+    with urllib.request.urlopen(uri) as url:
+        tmp_scryfall_data = json.loads(url.read().decode())
+        
+        for x in tmp_scryfall_data["data"]:
+            scryfall_data[x["card_faces"][0]["name"]] = x["name"] 
+        if "next_page" in tmp_scryfall_data:
+            fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
 
 # Utility function to replace strings in the csv from the replacements.config file.
 def replace_strings(dict, replacementSection, columnName):
@@ -24,6 +46,32 @@ def getPathPrefix():
         # else, use current directory
         prefix = os.path.abspath(".")
     return prefix
+
+#Check to see if we have DFC/Split/etc card names from scryfall and if it is up to date
+try:
+    multi_files_last_updated = os.path.getmtime(MULTI_NAMES_FILE)
+    print("%s last modified: %s" % (MULTI_NAMES_FILE,time.ctime(multi_files_last_updated)))
+    now = time.time()
+    last_week = now - 60*60*24*7
+    if multi_files_last_updated < last_week:
+        print("File %s is stale - updating..." % (MULTI_NAMES_FILE))
+        fetch_multiple_names(SCRYFALL_URL)
+        with open(MULTI_NAMES_FILE, 'w') as multiple_names:
+            json.dump(scryfall_data, multiple_names)
+        print("Done!")
+    else: 
+        print("Using existing %s file..." % MULTI_NAMES_FILE)
+        with open(MULTI_NAMES_FILE) as multiple_names:
+            scryfall_data = json.load(multiple_names)
+        print("Done!")
+
+except Exception:
+    print("File %s not found - creating..." % (MULTI_NAMES_FILE))
+    fetch_multiple_names(SCRYFALL_URL)
+    with open(MULTI_NAMES_FILE, 'w') as multiple_names:
+        json.dump(scryfall_data, multiple_names)
+    print("Done!")
+
 
 
 # Get our input
@@ -88,6 +136,8 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
         row["Name"]=row["Name"].replace(" (Extended Art)","")
         row["Name"]=row["Name"].replace(" (Showcase)","")
         row["Name"]=row["Name"].replace(" (Borderless)","")
+        row["Name"]=row["Name"].replace(" (Stained Glass)","")
+        row["Name"]=row["Name"].replace(" (Etched Foil)","")
         #For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"]=row["Name"].replace(" - Full Art","")
 
@@ -100,6 +150,9 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
         # Remove numbers, mostly for lands, but for some other special cases (M21 Teferi)
         row["Name"] = re.sub(r" \(\d+\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
+        if row["Name"] in scryfall_data:
+            row["Name"]=scryfall_data[row["Name"]]
+
 
         # remove weird symbols from card numbers
         row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])

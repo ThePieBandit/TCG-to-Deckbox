@@ -1,1 +1,5 @@
 deckbox_import.csv
+build
+dist
+multiple_names.json
+__pycache__

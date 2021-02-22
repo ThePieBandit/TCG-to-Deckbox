@@ -9,6 +9,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 import tkinter as tk
 import urllib.request
+import ssl
 import json
 
 
@@ -27,13 +28,17 @@ root.withdraw()
 
 def fetch_multiple_names(uri, page=1):
     print('Begin: Download %s, page %s of results' % (uri, page))
-    with urllib.request.urlopen(uri) as url:
-        tmp_scryfall_data = json.loads(url.read().decode())
+    try:
+        with urllib.request.urlopen(uri, context=ssl.create_default_context()) as url:
+            tmp_scryfall_data = json.loads(url.read().decode())
 
-        for x in tmp_scryfall_data["data"]:
-            scryfall_data[x["card_faces"][0]["name"]] = x["name"]
-        if "next_page" in tmp_scryfall_data:
-            fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
+            for x in tmp_scryfall_data["data"]:
+                scryfall_data[x["card_faces"][0]["name"]] = x["name"]
+            if "next_page" in tmp_scryfall_data:
+                fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
+    except Exception:
+        print('Exception: Was unable to download %s, page %s of results' % (uri, page))
+        print(Exception)
 
 # Utility function to replace strings in the csv from the replacements.config file.
 

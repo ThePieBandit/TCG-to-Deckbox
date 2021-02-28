@@ -8,7 +8,7 @@ import re
 from tkinter import filedialog
 from tkinter import messagebox
 import tkinter as tk
-import urllib.request
+import requests
 import ssl
 import json
 
@@ -29,8 +29,8 @@ root.withdraw()
 def fetch_multiple_names(uri, page=1):
     print('Begin: Download %s, page %s of results' % (uri, page))
     try:
-        with urllib.request.urlopen(uri, context=ssl.create_default_context()) as url:
-            tmp_scryfall_data = json.loads(url.read().decode())
+        with requests.get(uri) as response:
+            tmp_scryfall_data = response.json()
 
             for x in tmp_scryfall_data["data"]:
                 scryfall_data[x["card_faces"][0]["name"]] = x["name"]

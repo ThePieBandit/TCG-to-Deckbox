@@ -154,6 +154,7 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         row["Name"] = row["Name"].replace(" (Borderless)", "")
         row["Name"] = row["Name"].replace(" (Stained Glass)", "")
         row["Name"] = row["Name"].replace(" (Etched Foil)", "")
+        row["Name"] = row["Name"].replace(" (Foil Etched)", "")
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")
 

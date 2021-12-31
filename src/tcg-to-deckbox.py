@@ -15,7 +15,8 @@ import json
 
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
-SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-layout%3Aart_series"
+SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
+MULTI_NAMES_IGNORE = ["Nicol Bolas, the Ravager","Hadana's Climb"]
 
 #global vars
 scryfall_data = {}
@@ -36,7 +37,11 @@ def fetch_multiple_names(uri, page=1):
             tmp_scryfall_data = response.json()
 
             for x in tmp_scryfall_data["data"]:
-                scryfall_data[x["card_faces"][0]["name"]] = x["name"]
+                if x["card_faces"][0]["name"] in MULTI_NAMES_IGNORE:
+                    # detected a card we want to ignore from scryfall
+                    continue
+                else:
+                    scryfall_data[x["card_faces"][0]["name"]] = x["name"]
             if "next_page" in tmp_scryfall_data:
                 fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
     except Exception:
@@ -153,13 +158,16 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         replace_strings(row, "LANGUAGES", "Language")
 
         # Map Specific Card Names, and drop extra tidbits
-        #row["Name"] = row["Name"].replace(" (Alternate Art)", "")
-        #row["Name"] = row["Name"].replace(" (Extended Art)", "")
-        #row["Name"] = row["Name"].replace(" (Showcase)", "")
-        #row["Name"] = row["Name"].replace(" (Borderless)", "")
-        #row["Name"] = row["Name"].replace(" (Stained Glass)", "")
-        #row["Name"] = row["Name"].replace(" (Etched Foil)", "")
-        #row["Name"] = row["Name"].replace(" (Foil Etched)", "")
+        # alternative art/name for Dracula cards
+        row["Name"] = row["Name"].replace("Sisters of the Undead - ", "")
+        row["Name"] = row["Name"].replace("Mina Harker - ", "")
+        row["Name"] = row["Name"].replace("Abraham Van Helsing - ", "")
+        row["Name"] = row["Name"].replace("Dracula, Lord of Blood - ", "")
+        row["Name"] = row["Name"].replace("Dracula the Voyager - ", "")
+        row["Name"] = row["Name"].replace("Dracula, Blood Immortal - ", "")
+
+        # For BFZ lands...there's no differentiator from the full arts and the non full arts.
+        row["Name"] = row["Name"].replace(" - Full Art", "")
 
         # Very specifc conditons
         # war of the spark Alternate arts handled differently

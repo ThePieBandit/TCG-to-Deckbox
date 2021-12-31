@@ -15,10 +15,13 @@ import json
 
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
-SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1"
+SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-layout%3Aart_series"
 
 #global vars
 scryfall_data = {}
+
+#Global replacement helpers
+ixalan_bab = ["Legion's Landing", "Search for Azcanta", "Arguel's Blood Fast", "Vance's Blasting Cannons", "Growing Rites of Itlimoc", "Conqueror's Galleon", "Dowsing Dagger", "Primal Amulet", "Thaumatic Compass", "Treasure Map"]
 
 
 # Get rid of the root TK window, we don't need it.
@@ -133,6 +136,8 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         deckboxcsvfile, quoting=csv.QUOTE_ALL, fieldnames=headersdeckbox)
     csvwriter.writeheader()
     for row in csvreader:
+        skip_scryfall_names=False
+        
         # Don't bother with columns that are going to be ignored anyways
         for skippable in skipcolumns:
             row.pop(skippable, '')
@@ -148,25 +153,31 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         replace_strings(row, "LANGUAGES", "Language")
 
         # Map Specific Card Names, and drop extra tidbits
-        row["Name"] = row["Name"].replace(" (Alternate Art)", "")
-        row["Name"] = row["Name"].replace(" (Extended Art)", "")
-        row["Name"] = row["Name"].replace(" (Showcase)", "")
-        row["Name"] = row["Name"].replace(" (Borderless)", "")
-        row["Name"] = row["Name"].replace(" (Stained Glass)", "")
-        row["Name"] = row["Name"].replace(" (Etched Foil)", "")
-        row["Name"] = row["Name"].replace(" (Foil Etched)", "")
-        # For BFZ lands...there's no differentiator from the full arts and the non full arts.
-        row["Name"] = row["Name"].replace(" - Full Art", "")
+        #row["Name"] = row["Name"].replace(" (Alternate Art)", "")
+        #row["Name"] = row["Name"].replace(" (Extended Art)", "")
+        #row["Name"] = row["Name"].replace(" (Showcase)", "")
+        #row["Name"] = row["Name"].replace(" (Borderless)", "")
+        #row["Name"] = row["Name"].replace(" (Stained Glass)", "")
+        #row["Name"] = row["Name"].replace(" (Etched Foil)", "")
+        #row["Name"] = row["Name"].replace(" (Foil Etched)", "")
 
         # Very specifc conditons
+        # war of the spark Alternate arts handled differently
         if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
             row["Edition"] = "War of the Spark Japanese Alternate Art"
             row["Name"] = row["Name"].replace(" (JP Alternate Art)", "")
+        # Buy a Box Promos worled a little differently with Ixalan
+        if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
+            row["Edition"] = "Black Friday Treasure Chest Promos"
+            skip_scryfall_names=True
 
-        # Remove numbers, mostly for lands, but for some other special cases (M21 Teferi)
-        row["Name"] = re.sub(r" \(\d+\)", "", row["Name"])
+            
+        # For BFZ lands...there's no differentiator from the full arts and the non full arts.
+        row["Name"] = row["Name"].replace(" - Full Art", "")
+
+        row["Name"] = re.sub(r" \([^)(]+\)$", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
-        if row["Name"] in scryfall_data:
+        if skip_scryfall_names == False and row["Name"] in scryfall_data:
             row["Name"] = scryfall_data[row["Name"]]
 
         # remove weird symbols from card numbers

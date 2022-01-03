@@ -16,7 +16,7 @@ import json
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
 SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
-MULTI_NAMES_IGNORE = ["Nicol Bolas, the Ravager","Hadana's Climb"]
+MULTI_NAMES_IGNORE = ["Nicol Bolas, the Ravager","Hadana's Climb", "Treasure Map", "Storm the Vault"]
 
 #global vars
 scryfall_data = {}
@@ -24,6 +24,9 @@ scryfall_data = {}
 #Global replacement helpers
 ixalan_bab = ["Legion's Landing", "Search for Azcanta", "Arguel's Blood Fast", "Vance's Blasting Cannons", "Growing Rites of Itlimoc", "Conqueror's Galleon", "Dowsing Dagger", "Primal Amulet", "Thaumatic Compass", "Treasure Map"]
 
+bab_mapping = {
+    "Impervious Greatwurm": "Guilds of Ravnica"
+}
 
 # Get rid of the root TK window, we don't need it.
 root = tk.Tk()
@@ -178,12 +181,14 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = "Black Friday Treasure Chest Promos"
             skip_scryfall_names=True
-
+        # Handle other BaB promo cards
+        if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
+            row["Edition"] = bab_mapping[row["Name"]]
             
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")
 
-        row["Name"] = re.sub(r" \([^)(]+\)$", "", row["Name"])
+        row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
         if skip_scryfall_names == False and row["Name"] in scryfall_data:
             row["Name"] = scryfall_data[row["Name"]]

@@ -184,6 +184,10 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         # Handle other BaB promo cards
         if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = bab_mapping[row["Name"]]
+        # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
+        # on deckbox, while tcgplayer differentiates by name appending '(No PW Symbol)'
+        if "(No PW Symbol)" in row["Name"] and row["Edition"] == "Mystery Booster: Convention Edition Exclusives":
+            row["Edition"] = "Mystery Booster Playtest Cards 2021"
             
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")

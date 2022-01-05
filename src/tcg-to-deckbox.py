@@ -21,6 +21,9 @@ MULTI_NAMES_IGNORE = [
     "Hadana's Climb",
     "Treasure Map",
     "Storm the Vault",
+    "Hanweir Militia Captain",
+    "Legion's Landing",
+    "Geier Reach Bandit",
 ]
 
 # global vars
@@ -40,7 +43,12 @@ ixalan_bab = [
     "Treasure Map",
 ]
 
-bab_mapping = {"Impervious Greatwurm": "Guilds of Ravnica"}
+bab_mapping = {
+    "Impervious Greatwurm": "Guilds of Ravnica",
+    "Kenrith, the Returned King": "Throne of Eldraine",
+    "Realmwalker": "Kaldheim",
+    "Vorpal Sword": "Adventures in the Forgotten Realms",
+}
 
 # Get rid of the root TK window, we don't need it.
 root = tk.Tk()
@@ -194,14 +202,6 @@ with open(FILE, newline="") as tcgcsvfile, open(
         replace_strings(row, "LANGUAGES", "Language")
 
         # Map Specific Card Names, and drop extra tidbits
-        # alternative art/name for Dracula cards
-        row["Name"] = row["Name"].replace("Sisters of the Undead - ", "")
-        row["Name"] = row["Name"].replace("Mina Harker - ", "")
-        row["Name"] = row["Name"].replace("Abraham Van Helsing - ", "")
-        row["Name"] = row["Name"].replace("Dracula, Lord of Blood - ", "")
-        row["Name"] = row["Name"].replace("Dracula the Voyager - ", "")
-        row["Name"] = row["Name"].replace("Dracula, Blood Immortal - ", "")
-
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")
 
@@ -214,9 +214,6 @@ with open(FILE, newline="") as tcgcsvfile, open(
         if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = "Black Friday Treasure Chest Promos"
             skip_scryfall_names = True
-        # Handle other BaB promo cards
-        if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
-            row["Edition"] = bab_mapping[row["Name"]]
         # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
         # on deckbox, while tcgplayer differentiates by name appending '(No PW Symbol)'
         if (
@@ -229,6 +226,9 @@ with open(FILE, newline="") as tcgcsvfile, open(
         replace_strings(row, "NAMES", "Name")
         if skip_scryfall_names == False and row["Name"] in scryfall_data:
             row["Name"] = scryfall_data[row["Name"]]
+        # Fix edition for Buy-A-Box Promos
+        if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
+            row["Edition"] = bab_mapping[row["Name"]]
 
         # remove weird symbols from card numbers
         row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])

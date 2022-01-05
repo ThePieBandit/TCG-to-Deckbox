@@ -24,3 +24,16 @@ In both cases, it will give you a new csv, named `deckbox_import.csv` in the dir
 2. Showcase and extended art cards - TCGplayer suffixes these with `(Extended Art)` or `(Showcase)`. If the script finds these terms, it just deletes them. They're unnecessary as they have different collector's numbers.
 
 3. Odd sets from Magic's history - I did my best here, but some of the older sets didn't quite line up. Some I just didn't have enough information on, some looked like categories of multiple sets, and some actually look like they map to multple different sets in deckbox. If you hit some of these, manual correction is probably the best bet for now, but if you have a solution, feel free to share!
+
+## Contributing
+When making pull requests please format Python code using Black [black](https://github.com/psf/black) 
+
+```sh
+# installing black
+pip install black
+```
+
+```sh
+# running black
+black tcg-to-deckbox.py
+```

@@ -3,3 +3,4 @@ build
 dist
 multiple_names.json
 __pycache__
+.vscode/settings.json

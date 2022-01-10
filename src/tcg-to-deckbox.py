@@ -16,14 +16,39 @@ import json
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
 SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
-MULTI_NAMES_IGNORE = ["Nicol Bolas, the Ravager","Hadana's Climb"]
+MULTI_NAMES_IGNORE = [
+    "Nicol Bolas, the Ravager",
+    "Hadana's Climb",
+    "Treasure Map",
+    "Storm the Vault",
+    "Hanweir Militia Captain",
+    "Legion's Landing",
+    "Geier Reach Bandit",
+]
 
-#global vars
+# global vars
 scryfall_data = {}
 
-#Global replacement helpers
-ixalan_bab = ["Legion's Landing", "Search for Azcanta", "Arguel's Blood Fast", "Vance's Blasting Cannons", "Growing Rites of Itlimoc", "Conqueror's Galleon", "Dowsing Dagger", "Primal Amulet", "Thaumatic Compass", "Treasure Map"]
+# Global replacement helpers
+ixalan_bab = [
+    "Legion's Landing",
+    "Search for Azcanta",
+    "Arguel's Blood Fast",
+    "Vance's Blasting Cannons",
+    "Growing Rites of Itlimoc",
+    "Conqueror's Galleon",
+    "Dowsing Dagger",
+    "Primal Amulet",
+    "Thaumatic Compass",
+    "Treasure Map",
+]
 
+bab_mapping = {
+    "Impervious Greatwurm": "Guilds of Ravnica",
+    "Kenrith, the Returned King": "Throne of Eldraine",
+    "Realmwalker": "Kaldheim",
+    "Vorpal Sword": "Adventures in the Forgotten Realms",
+}
 
 # Get rid of the root TK window, we don't need it.
 root = tk.Tk()
@@ -31,7 +56,7 @@ root.withdraw()
 
 
 def fetch_multiple_names(uri, page=1):
-    print('Begin: Download %s, page %s of results' % (uri, page))
+    print("Begin: Download %s, page %s of results" % (uri, page))
     try:
         with requests.get(uri) as response:
             tmp_scryfall_data = response.json()
@@ -45,8 +70,9 @@ def fetch_multiple_names(uri, page=1):
             if "next_page" in tmp_scryfall_data:
                 fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
     except Exception:
-        print('Exception: Was unable to download %s, page %s of results' % (uri, page))
+        print("Exception: Was unable to download %s, page %s of results" % (uri, page))
         print(Exception)
+
 
 # Utility function to replace strings in the csv from the replacements.config file.
 
@@ -69,14 +95,16 @@ def getPathPrefix():
 # Check to see if we have DFC/Split/etc card names from scryfall and if it is up to date
 try:
     multi_files_last_updated = os.path.getmtime(MULTI_NAMES_FILE)
-    print("%s last modified: %s" %
-          (MULTI_NAMES_FILE, time.ctime(multi_files_last_updated)))
+    print(
+        "%s last modified: %s"
+        % (MULTI_NAMES_FILE, time.ctime(multi_files_last_updated))
+    )
     now = time.time()
-    last_week = now - 60*60*24*7
+    last_week = now - 60 * 60 * 24 * 7
     if multi_files_last_updated < last_week:
         print("File %s is stale - updating..." % (MULTI_NAMES_FILE))
         fetch_multiple_names(SCRYFALL_URL)
-        with open(MULTI_NAMES_FILE, 'w') as multiple_names:
+        with open(MULTI_NAMES_FILE, "w") as multiple_names:
             json.dump(scryfall_data, multiple_names)
         print("Done!")
     else:
@@ -88,7 +116,7 @@ try:
 except Exception:
     print("File %s not found - creating..." % (MULTI_NAMES_FILE))
     fetch_multiple_names(SCRYFALL_URL)
-    with open(MULTI_NAMES_FILE, 'w') as multiple_names:
+    with open(MULTI_NAMES_FILE, "w") as multiple_names:
         json.dump(scryfall_data, multiple_names)
     print("Done!")
 
@@ -97,23 +125,36 @@ except Exception:
 GUI = False
 if len(sys.argv) < 2:
     GUI = True
-    FILE = filedialog.askopenfilename(title="Select your TCGPlayer app export file", filetypes=[
-        ("TCGPlayer exports", ".csv"), ("All files", "*.*")])
+    FILE = filedialog.askopenfilename(
+        title="Select your TCGPlayer app export file",
+        filetypes=[("TCGPlayer exports", ".csv"), ("All files", "*.*")],
+    )
     if len(FILE) == 0:
-        messagebox.showerror(title="Input file not provided",
-                             message="You must pass the TCGPlayer csv export file to this program.")
+        messagebox.showerror(
+            title="Input file not provided",
+            message="You must pass the TCGPlayer csv export file to this program.",
+        )
         sys.exit()
 else:
     FILE = sys.argv[1]
 
-skipcolumns = ["Simple Name", "Set Code", "Rarity",
-               "Product ID", "SKU", "Price", "Price Each"]
+skipcolumns = [
+    "Simple Name",
+    "Set Code",
+    "Rarity",
+    "Product ID",
+    "SKU",
+    "Price",
+    "Price Each",
+]
 outputFile = "deckbox_import.csv"
 
 configParser = configparser.ConfigParser(delimiters="=")
 configParser.read(os.path.join(getPathPrefix(), "replacements.config"))
 
-with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as deckboxcsvfile:
+with open(FILE, newline="") as tcgcsvfile, open(
+    outputFile, "w", newline=""
+) as deckboxcsvfile:
 
     try:
         csv.Sniffer().sniff(tcgcsvfile.read(4096), delimiters=",")
@@ -121,7 +162,9 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
     except:
         if GUI:
             messagebox.showerror(
-                title="Invalid input file", message="The file selected does not appear to be a valid CSV file.")
+                title="Invalid input file",
+                message="The file selected does not appear to be a valid CSV file.",
+            )
         else:
             print("The file passed does not appear to be a valid CSV file.")
         sys.exit()
@@ -138,14 +181,15 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
     headersdeckbox = [x for x in headerstcg if x not in skipcolumns]
 
     csvwriter = csv.DictWriter(
-        deckboxcsvfile, quoting=csv.QUOTE_ALL, fieldnames=headersdeckbox)
+        deckboxcsvfile, quoting=csv.QUOTE_ALL, fieldnames=headersdeckbox
+    )
     csvwriter.writeheader()
     for row in csvreader:
-        skip_scryfall_names=False
-        
+        skip_scryfall_names = False
+
         # Don't bother with columns that are going to be ignored anyways
         for skippable in skipcolumns:
-            row.pop(skippable, '')
+            row.pop(skippable, "")
 
         # Map the printing column to the Foil column
         if row["Foil"] == "Normal":
@@ -158,14 +202,6 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         replace_strings(row, "LANGUAGES", "Language")
 
         # Map Specific Card Names, and drop extra tidbits
-        # alternative art/name for Dracula cards
-        row["Name"] = row["Name"].replace("Sisters of the Undead - ", "")
-        row["Name"] = row["Name"].replace("Mina Harker - ", "")
-        row["Name"] = row["Name"].replace("Abraham Van Helsing - ", "")
-        row["Name"] = row["Name"].replace("Dracula, Lord of Blood - ", "")
-        row["Name"] = row["Name"].replace("Dracula the Voyager - ", "")
-        row["Name"] = row["Name"].replace("Dracula, Blood Immortal - ", "")
-
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")
 
@@ -177,16 +213,22 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
         # Buy a Box Promos worled a little differently with Ixalan
         if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = "Black Friday Treasure Chest Promos"
-            skip_scryfall_names=True
+            skip_scryfall_names = True
+        # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
+        # on deckbox, while tcgplayer differentiates by name appending '(No PW Symbol)'
+        if (
+            "(No PW Symbol)" in row["Name"]
+            and row["Edition"] == "Mystery Booster: Convention Edition Exclusives"
+        ):
+            row["Edition"] = "Mystery Booster Playtest Cards 2021"
 
-            
-        # For BFZ lands...there's no differentiator from the full arts and the non full arts.
-        row["Name"] = row["Name"].replace(" - Full Art", "")
-
-        row["Name"] = re.sub(r" \([^)(]+\)$", "", row["Name"])
+        row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
         if skip_scryfall_names == False and row["Name"] in scryfall_data:
             row["Name"] = scryfall_data[row["Name"]]
+        # Fix edition for Buy-A-Box Promos
+        if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
+            row["Edition"] = bab_mapping[row["Name"]]
 
         # remove weird symbols from card numbers
         row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])
@@ -199,9 +241,9 @@ with open(FILE, newline="") as tcgcsvfile, open(outputFile, "w", newline="") as 
 
 # All Done!
 successMsg = "Your import file for deckbox.org is available here: %s" % os.path.abspath(
-    outputFile)
+    outputFile
+)
 if GUI:
-    messagebox.showinfo(
-        title="Conversion completed successfully!", message=successMsg)
+    messagebox.showinfo(title="Conversion completed successfully!", message=successMsg)
 else:
     print(successMsg)

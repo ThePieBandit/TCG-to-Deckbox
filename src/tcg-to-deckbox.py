@@ -9,24 +9,17 @@ from tkinter import filedialog
 from tkinter import messagebox
 import tkinter as tk
 import requests
+import urllib.parse
 import ssl
 import json
 
 
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
-SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
-MULTI_NAMES_IGNORE = [
-    "Nicol Bolas, the Ravager",
-    "Hadana's Climb",
-    "Treasure Map",
-    "Storm the Vault",
-    "Hanweir Militia Captain",
-    "Legion's Landing",
-    "Geier Reach Bandit",
-]
+SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
+DECKBOX_URL = "https://deckbox.org/mtg/"
 
-# global vars
+# Global Data
 scryfall_data = {}
 
 # Global replacement helpers
@@ -54,19 +47,17 @@ bab_mapping = {
 root = tk.Tk()
 root.withdraw()
 
-
+# Queries scryfall to build a list of cards that have multiple names.
 def fetch_multiple_names(uri, page=1):
-    print("Begin: Download %s, page %s of results" % (uri, page))
+    print(
+        "Begin: Download '%s', page %s of results" % (urllib.parse.unquote(uri), page)
+    )
     try:
-        with requests.get(uri) as response:
-            tmp_scryfall_data = response.json()
+        with requests.get(uri) as scryfall_response:
+            tmp_scryfall_data = scryfall_response.json()
 
             for x in tmp_scryfall_data["data"]:
-                if x["card_faces"][0]["name"] in MULTI_NAMES_IGNORE:
-                    # detected a card we want to ignore from scryfall
-                    continue
-                else:
-                    scryfall_data[x["card_faces"][0]["name"]] = x["name"]
+                scryfall_data[x["card_faces"][0]["name"]] = x["name"]
             if "next_page" in tmp_scryfall_data:
                 fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
     except Exception:
@@ -75,13 +66,12 @@ def fetch_multiple_names(uri, page=1):
 
 
 # Utility function to replace strings in the csv from the replacements.config file.
-
-
 def replace_strings(dict, replacementSection, columnName):
     if dict[columnName].lower() in configParser[replacementSection].keys():
         dict[columnName] = configParser[replacementSection][dict[columnName].lower()]
 
 
+# Utility function to handle differences in lookup path if there's a UI involved.
 def getPathPrefix():
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
@@ -94,14 +84,16 @@ def getPathPrefix():
 
 # Check to see if we have DFC/Split/etc card names from scryfall and if it is up to date
 try:
-    multi_files_last_updated = os.path.getmtime(MULTI_NAMES_FILE)
+    multi_names_file_last_updated = os.path.getmtime(MULTI_NAMES_FILE)
     print(
         "%s last modified: %s"
-        % (MULTI_NAMES_FILE, time.ctime(multi_files_last_updated))
+        % (MULTI_NAMES_FILE, time.ctime(multi_names_file_last_updated))
     )
     now = time.time()
     last_week = now - 60 * 60 * 24 * 7
-    if multi_files_last_updated < last_week:
+
+    # Refresh the multiple names file if it's a week old, else use the cached version
+    if multi_names_file_last_updated < last_week:
         print("File %s is stale - updating..." % (MULTI_NAMES_FILE))
         fetch_multiple_names(SCRYFALL_URL)
         with open(MULTI_NAMES_FILE, "w") as multiple_names:
@@ -112,7 +104,7 @@ try:
         with open(MULTI_NAMES_FILE) as multiple_names:
             scryfall_data = json.load(multiple_names)
         print("Done!")
-
+# If the file isn't found, create it
 except Exception:
     print("File %s not found - creating..." % (MULTI_NAMES_FILE))
     fetch_multiple_names(SCRYFALL_URL)
@@ -201,19 +193,23 @@ with open(FILE, newline="") as tcgcsvfile, open(
         # Map Chinese Languages
         replace_strings(row, "LANGUAGES", "Language")
 
-        # Map Specific Card Names, and drop extra tidbits
+        ####################################################################
+        # Map Specific Card Conditions
+        ####################################################################
+
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")
 
-        # Very specifc conditons
-        # war of the spark Alternate arts handled differently
+        # War of the Spark Alternate Arts handled differently
         if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
             row["Edition"] = "War of the Spark Japanese Alternate Art"
             row["Name"] = row["Name"].replace(" (JP Alternate Art)", "")
-        # Buy a Box Promos worled a little differently with Ixalan
+
+        # Buy a Box Promos worked a little differently with Ixalan
         if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = "Black Friday Treasure Chest Promos"
             skip_scryfall_names = True
+
         # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
         # on deckbox, while tcgplayer differentiates by name appending '(No PW Symbol)'
         if (
@@ -222,10 +218,34 @@ with open(FILE, newline="") as tcgcsvfile, open(
         ):
             row["Edition"] = "Mystery Booster Playtest Cards 2021"
 
+        ####################################################################
+        # Handle General Card Conversions
+        ####################################################################
+
+        # Remove all Parentheses at the end of cards
         row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
-        if skip_scryfall_names == False and row["Name"] in scryfall_data:
-            row["Name"] = scryfall_data[row["Name"]]
+        # We need to do a little extra work on dual faced cards, because deckbox is inconsistent with whether it refers to cards by both names or just the front face.
+        if row["Name"] in scryfall_data:
+            deckbox_request_url = DECKBOX_URL + urllib.parse.quote(
+                scryfall_data[row["Name"]]
+            )
+            with requests.get(deckbox_request_url) as deckbox_response:
+
+                # If we are not redirected to a new page, then we should only use the front face name
+                if deckbox_request_url == deckbox_response.url:
+                    print(
+                        "Dual name for '%s' found on deckbox, the dual name will be used for the import."
+                        % (scryfall_data[row["Name"]], scryfall_data[row["Name"]])
+                    )
+                else:
+                    print(
+                        "Dual name not found for '%s' on deckbox, front face name '%s' will be used."
+                        % (scryfall_data[row["Name"]], row["Name"])
+                    )
+                    skip_scryfall_names = True
+            if skip_scryfall_names == False:
+                row["Name"] = scryfall_data[row["Name"]]
         # Fix edition for Buy-A-Box Promos
         if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = bab_mapping[row["Name"]]

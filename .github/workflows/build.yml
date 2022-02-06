@@ -1,0 +1,44 @@
+name: CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+# additionally allows a manual trigger via workflow_dispatch
+on:
+  workflow_dispatch:
+    types: ManualUpdate
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    - name: Build Linux Executable
+      uses: JackMcKew/pyinstaller-action-linux@tkinter
+      with:
+        path: src
+        tkinter: true
+    - name: Upload Linux Executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: tcg-to-deckbox
+        path: src/dist/linux
+    - name: Build Windows Executable
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: src
+    - name: Upload Windows Executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: tcg-to-deckbox
+        path: src/dist/windows

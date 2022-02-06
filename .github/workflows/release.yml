@@ -1,11 +1,9 @@
-name: CI
+name: CD
 
 on:
   workflow_dispatch:
     types: ManualUpdate
   push:
-    branches: [ master ]
-  pull_request:
     branches: [ master ]
 
 jobs:

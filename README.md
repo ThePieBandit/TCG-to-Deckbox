@@ -10,12 +10,12 @@ https://deckbox.org/ is a popular tool for cataloging one's [Magic: the Gatherin
 The script has two modes: CLI and GUI. To use the CLI, provide the path to your TCGplayer csv file:
 
     python3 tcg-to-deckbox.py ~/bin/sample_input.csv
-    
+
 To start it in GUI mode, just launch the program without any arguments
 
     python3 tcg-to-deckbox.py
-    
-In both cases, it will give you a new csv, named `deckbox_import.csv` in the directory from which the script was run. 
+
+In both cases, it will give you a new csv, named `deckbox_import.csv` in the directory from which the script was run.
 
 ## Limitations
 
@@ -23,4 +23,17 @@ In both cases, it will give you a new csv, named `deckbox_import.csv` in the dir
 
 2. Showcase and extended art cards - TCGplayer suffixes these with `(Extended Art)` or `(Showcase)`. If the script finds these terms, it just deletes them. They're unnecessary as they have different collector's numbers.
 
-3. Odd sets from Magic's history - I did my best here, but some of the older sets didn't quite line up. Some I just didn't have enough information on, some looked like categories of multiple sets, and some actually look like they map to multple different sets in deckbox. If you hit some of these, manual correction is probably the best bet for now, but if you have a solution, feel free to share!
+3. Odd sets from Magic's history - I did my best here, but some of the older sets didn't quite line up. Some I just didn't have enough information on, some looked like categories of multiple sets, and some actually look like they map to multiple different sets in deckbox. If you hit some of these, manual correction is probably the best bet for now, but if you have a solution, feel free to share!
+
+## Contributing
+When making pull requests please format Python code using Black [black](https://github.com/psf/black)
+
+```sh
+# installing black
+pip install black
+```
+
+```sh
+# running black
+black tcg-to-deckbox.py
+```

@@ -233,10 +233,13 @@ with open(FILE, newline="") as tcgcsvfile, open(
             with requests.get(deckbox_request_url) as deckbox_response:
 
                 # If we are not redirected to a new page, then we should only use the front face name
-                if deckbox_request_url == deckbox_response.url:
+                deckbox_response_url_parts = urllib.parse.urlparse(deckbox_response.url)
+                deckbox_response_url = deckbox_response_url_parts._replace(fragment="")._replace(query="").geturl()
+                
+                if deckbox_request_url == deckbox_response_url or deckbox_request_url.replace("//", "/") == deckbox_response_url.replace("//", "/"):
                     print(
                         "Dual name for '%s' found on deckbox, the dual name will be used for the import."
-                        % (scryfall_data[row["Name"]], scryfall_data[row["Name"]])
+                        % (scryfall_data[row["Name"]])
                     )
                 else:
                     print(

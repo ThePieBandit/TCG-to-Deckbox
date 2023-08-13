@@ -12,15 +12,19 @@ import requests
 import urllib.parse
 import ssl
 import json
-
+import traceback
 
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
-SCRYFALL_URL = "https://api.scryfall.com/cards/search?order=cmc&q=%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
+BAB_FILE = "bab.json"
+SCRYFALL_BASE_URL = "https://api.scryfall.com/cards/search?order=cmc&q="
+SCRYFALL_DFC_URL = SCRYFALL_BASE_URL + "%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
+SCRYFALL_BAB_URL = SCRYFALL_BASE_URL + "is%3Abab+AND+game%3Apaper"
 DECKBOX_URL = "https://deckbox.org/mtg/"
 
 # Global Data
 scryfall_data = {}
+scryfall_bab_data = {}
 
 # Global replacement helpers
 ixalan_bab = [
@@ -62,9 +66,25 @@ def fetch_multiple_names(uri, page=1):
                 fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
     except Exception:
         print("Exception: Was unable to download %s, page %s of results" % (uri, page))
-        print(Exception)
+        print(str(Exception))        
+        
+# Queries scryfall to build a list of cards that were buy a box promos.
+def fetch_bab_names(uri, page=1):
+    print(
+        "Begin: Download '%s', page %s of results" % (urllib.parse.unquote(uri), page)
+    )
+    try:
+        with requests.get(uri) as scryfall_response:
+            tmp_scryfall_data = scryfall_response.json()
 
-
+            for x in tmp_scryfall_data["data"]:
+                scryfall_bab_data[x["name"]] = x["set_name"]
+            if "next_page" in tmp_scryfall_data:
+                fetch_bab_names(tmp_scryfall_data["next_page"], page + 1)
+    except Exception:
+        print("Exception: Was unable to download %s, page %s of results" % (uri, page))
+        traceback.print_exc()
+        
 # Utility function to replace strings in the csv from the replacements.config file.
 def replace_strings(dict, replacementSection, columnName):
     if dict[columnName].lower() in configParser[replacementSection].keys():
@@ -95,7 +115,7 @@ try:
     # Refresh the multiple names file if it's a week old, else use the cached version
     if multi_names_file_last_updated < last_week:
         print("File %s is stale - updating..." % (MULTI_NAMES_FILE))
-        fetch_multiple_names(SCRYFALL_URL)
+        fetch_multiple_names(SCRYFALL_DFC_URL)
         with open(MULTI_NAMES_FILE, "w") as multiple_names:
             json.dump(scryfall_data, multiple_names)
         print("Done!")
@@ -107,9 +127,40 @@ try:
 # If the file isn't found, create it
 except Exception:
     print("File %s not found - creating..." % (MULTI_NAMES_FILE))
-    fetch_multiple_names(SCRYFALL_URL)
+    fetch_multiple_names(SCRYFALL_DFC_URL)
     with open(MULTI_NAMES_FILE, "w") as multiple_names:
         json.dump(scryfall_data, multiple_names)
+    print("Done!")
+
+
+# Check to see if we have Buy a Box card names from scryfall and if it is up to date
+try:
+    bab_file_last_updated = os.path.getmtime(BAB_FILE)
+    print(
+        "%s last modified: %s"
+        % (BAB_FILE, time.ctime(bab_file_last_updated))
+    )
+    now = time.time()
+    last_week = now - 60 * 60 * 24 * 7
+
+    # Refresh the multiple names file if it's a week old, else use the cached version
+    if bab_file_last_updated < last_week:
+        print("File %s is stale - updating..." % (BAB_FILE))
+        fetch_bab_names(SCRYFALL_BAB_URL)
+        with open(BAB_FILE, "w") as multiple_names:
+            json.dump(scryfall_bab_data, multiple_names)
+        print("Done!")
+    else:
+        print("Using existing %s file..." % BAB_FILE)
+        with open(BAB_FILE) as multiple_names:
+            scryfall_bab_data = json.load(multiple_names)
+        print("Done!")
+# If the file isn't found, create it
+except Exception:
+    print("File %s not found - creating..." % (BAB_FILE))
+    fetch_bab_names(SCRYFALL_BAB_URL)
+    with open(BAB_FILE, "w") as multiple_names:
+        json.dump(scryfall_bab_data, multiple_names)
     print("Done!")
 
 
@@ -199,7 +250,7 @@ with open(FILE, newline="") as tcgcsvfile, open(
 
         # For BFZ lands...there's no differentiator from the full arts and the non full arts.
         row["Name"] = row["Name"].replace(" - Full Art", "")
-
+        
         # War of the Spark Alternate Arts handled differently
         if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
             row["Edition"] = "War of the Spark Japanese Alternate Art"
@@ -209,6 +260,13 @@ with open(FILE, newline="") as tcgcsvfile, open(
         if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = "Black Friday Treasure Chest Promos"
             skip_scryfall_names = True
+            
+        # TODO Merge this with above
+        if row["Name"] in scryfall_bab_data and row["Edition"] == "Buy-A-Box Promos":
+            if "Promos" in scryfall_bab_data[row["Name"]]:
+                row["Edition"] = "Media Inserts"
+            else:
+                row["Edition"] = scryfall_bab_data[row["Name"]]
 
         # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
         # on deckbox, while tcgplayer differentiates by name appending '(No PW Symbol)'
@@ -225,6 +283,7 @@ with open(FILE, newline="") as tcgcsvfile, open(
         # Remove all Parentheses at the end of cards
         row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
         replace_strings(row, "NAMES", "Name")
+        
         # We need to do a little extra work on dual faced cards, because deckbox is inconsistent with whether it refers to cards by both names or just the front face.
         if row["Name"] in scryfall_data:
             deckbox_request_url = DECKBOX_URL + urllib.parse.quote(
@@ -249,15 +308,28 @@ with open(FILE, newline="") as tcgcsvfile, open(
                     skip_scryfall_names = True
             if skip_scryfall_names == False:
                 row["Name"] = scryfall_data[row["Name"]]
+                
         # Fix edition for Buy-A-Box Promos
         if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
             row["Edition"] = bab_mapping[row["Name"]]
+            
+        # Move commander from edition to the end
+        if "Commander: " in row["Edition"]:
+            row["Edition"] = re.sub(r"Commander: (.*)$", r"\1 Commander", row["Edition"])
+        
+        # Remove Universes Beyond modifier
+        if "Universes Beyond: " in row["Edition"]:
+            row["Edition"] = re.sub(r"Universes Beyond: ", "", row["Edition"])
 
         # remove weird symbols from card numbers
         row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])
+        
+        # move Promo Pack to the end if it's not in replacements.config (some old ones actually do have the prefix
+        if "Promo Pack: " in row["Edition"] and not row["Edition"] in configParser["EDITONS"].keys():
+            row["Edition"] = re.sub(r"Promo Pack: (.*)$", r"\1 Promo Pack", row["Edition"])   
 
         # Map Specific Edition Names
-        replace_strings(row, "EDITONS", "Edition")
+        replace_strings(row, "EDITONS", "Edition")     
 
         # write the converted output
         csvwriter.writerow(row)

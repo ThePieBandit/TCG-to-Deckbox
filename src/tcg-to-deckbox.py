@@ -25,6 +25,10 @@ def getPathPrefix():
         prefix = os.path.abspath(".")
     return prefix
 
+def removePrefix( text, prefix ):
+    if text.startswith( prefix ):
+        return text[ len(prefix): ]
+    return text
 
 # Get our input
 GUI=False
@@ -106,6 +110,11 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
 
         # Map Specific Edition Names
         replace_strings(row, "EDITONS", "Edition")
+
+        # Convert 'Commander: ' to append ' Commander' as a suffix
+        if row["Edition"].startswith( "Commander: "):
+            row["Edition"] = removePrefix( row["Edition"], "Commander: " );
+            row["Edition"] = "".join( [row["Edition"], " Commander"] )
 
         # write the converted output
         csvwriter.writerow(row)

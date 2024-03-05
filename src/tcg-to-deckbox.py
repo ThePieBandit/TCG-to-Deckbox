@@ -116,6 +116,10 @@ with open(FILE, newline="") as tcgcsvfile,open(outputFile, "w", newline="") as d
             row["Edition"] = removePrefix( row["Edition"], "Commander: " );
             row["Edition"] = "".join( [row["Edition"], " Commander"] )
 
+        # Convert 'The List Reprints' to  just 'The List' as deckbox expects
+        if row["Edition"] == "The List Reprints":
+            row["Edition"] = "The List"
+
         # write the converted output
         csvwriter.writerow(row)
 

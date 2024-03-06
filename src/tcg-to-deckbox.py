@@ -1,187 +1,30 @@
-import sys
+import configparser
 import csv
-import time
+import json
 import os
 import os.path
-import configparser
 import re
-from tkinter import filedialog
-from tkinter import messagebox
-import tkinter as tk
-import requests
-import urllib.parse
-import ssl
-import json
+import sys
+import time
 import traceback
+import urllib.parse
+from csv import DictWriter, DictReader
+from typing import TextIO
+
+import requests
 
 # Constants
 MULTI_NAMES_FILE = "multiple_names.json"
 BAB_FILE = "bab.json"
 SCRYFALL_BASE_URL = "https://api.scryfall.com/cards/search?order=cmc&q="
-SCRYFALL_DFC_URL = SCRYFALL_BASE_URL + "%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20AND%20game%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra"
+# noinspection SpellCheckingInspection
+SCRYFALL_DFC_URL = SCRYFALL_BASE_URL + "%28is%3Adoublesided%20OR%20is%3Asplit%20OR%20is%3Aadventure%29%20AND%20game" \
+                                       "%3Apaper%20AND%20-is%3Atoken%20AND%20-set%3ACMB1%20AND%20-is%3Aextra "
+# noinspection SpellCheckingInspection
 SCRYFALL_BAB_URL = SCRYFALL_BASE_URL + "is%3Abab+AND+game%3Apaper"
 DECKBOX_URL = "https://deckbox.org/mtg/"
 
-# Global Data
-scryfall_data = {}
-scryfall_bab_data = {}
-
-# Global replacement helpers
-ixalan_bab = [
-    "Legion's Landing",
-    "Search for Azcanta",
-    "Arguel's Blood Fast",
-    "Vance's Blasting Cannons",
-    "Growing Rites of Itlimoc",
-    "Conqueror's Galleon",
-    "Dowsing Dagger",
-    "Primal Amulet",
-    "Thaumatic Compass",
-    "Treasure Map",
-]
-
-bab_mapping = {
-    "Impervious Greatwurm": "Guilds of Ravnica",
-    "Kenrith, the Returned King": "Throne of Eldraine",
-    "Realmwalker": "Kaldheim",
-    "Vorpal Sword": "Adventures in the Forgotten Realms",
-}
-
-# Get rid of the root TK window, we don't need it.
-root = tk.Tk()
-root.withdraw()
-
-# Queries scryfall to build a list of cards that have multiple names.
-def fetch_multiple_names(uri, page=1):
-    print(
-        "Begin: Download '%s', page %s of results" % (urllib.parse.unquote(uri), page)
-    )
-    try:
-        with requests.get(uri) as scryfall_response:
-            tmp_scryfall_data = scryfall_response.json()
-
-            for x in tmp_scryfall_data["data"]:
-                scryfall_data[x["card_faces"][0]["name"]] = x["name"]
-            if "next_page" in tmp_scryfall_data:
-                fetch_multiple_names(tmp_scryfall_data["next_page"], page + 1)
-    except Exception:
-        print("Exception: Was unable to download %s, page %s of results" % (uri, page))
-        print(str(Exception))        
-        
-# Queries scryfall to build a list of cards that were buy a box promos.
-def fetch_bab_names(uri, page=1):
-    print(
-        "Begin: Download '%s', page %s of results" % (urllib.parse.unquote(uri), page)
-    )
-    try:
-        with requests.get(uri) as scryfall_response:
-            tmp_scryfall_data = scryfall_response.json()
-
-            for x in tmp_scryfall_data["data"]:
-                scryfall_bab_data[x["name"]] = x["set_name"]
-            if "next_page" in tmp_scryfall_data:
-                fetch_bab_names(tmp_scryfall_data["next_page"], page + 1)
-    except Exception:
-        print("Exception: Was unable to download %s, page %s of results" % (uri, page))
-        traceback.print_exc()
-        
-# Utility function to replace strings in the csv from the replacements.config file.
-def replace_strings(dict, replacementSection, columnName):
-    if dict[columnName].lower() in configParser[replacementSection].keys():
-        dict[columnName] = configParser[replacementSection][dict[columnName].lower()]
-
-
-# Utility function to handle differences in lookup path if there's a UI involved.
-def getPathPrefix():
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        prefix = sys._MEIPASS
-    except Exception:
-        # else, use current directory
-        prefix = os.path.abspath(".")
-    return prefix
-
-
-# Check to see if we have DFC/Split/etc card names from scryfall and if it is up to date
-try:
-    multi_names_file_last_updated = os.path.getmtime(MULTI_NAMES_FILE)
-    print(
-        "%s last modified: %s"
-        % (MULTI_NAMES_FILE, time.ctime(multi_names_file_last_updated))
-    )
-    now = time.time()
-    last_week = now - 60 * 60 * 24 * 7
-
-    # Refresh the multiple names file if it's a week old, else use the cached version
-    if multi_names_file_last_updated < last_week:
-        print("File %s is stale - updating..." % (MULTI_NAMES_FILE))
-        fetch_multiple_names(SCRYFALL_DFC_URL)
-        with open(MULTI_NAMES_FILE, "w") as multiple_names:
-            json.dump(scryfall_data, multiple_names)
-        print("Done!")
-    else:
-        print("Using existing %s file..." % MULTI_NAMES_FILE)
-        with open(MULTI_NAMES_FILE) as multiple_names:
-            scryfall_data = json.load(multiple_names)
-        print("Done!")
-# If the file isn't found, create it
-except Exception:
-    print("File %s not found - creating..." % (MULTI_NAMES_FILE))
-    fetch_multiple_names(SCRYFALL_DFC_URL)
-    with open(MULTI_NAMES_FILE, "w") as multiple_names:
-        json.dump(scryfall_data, multiple_names)
-    print("Done!")
-
-
-# Check to see if we have Buy a Box card names from scryfall and if it is up to date
-try:
-    bab_file_last_updated = os.path.getmtime(BAB_FILE)
-    print(
-        "%s last modified: %s"
-        % (BAB_FILE, time.ctime(bab_file_last_updated))
-    )
-    now = time.time()
-    last_week = now - 60 * 60 * 24 * 7
-
-    # Refresh the multiple names file if it's a week old, else use the cached version
-    if bab_file_last_updated < last_week:
-        print("File %s is stale - updating..." % (BAB_FILE))
-        fetch_bab_names(SCRYFALL_BAB_URL)
-        with open(BAB_FILE, "w") as multiple_names:
-            json.dump(scryfall_bab_data, multiple_names)
-        print("Done!")
-    else:
-        print("Using existing %s file..." % BAB_FILE)
-        with open(BAB_FILE) as multiple_names:
-            scryfall_bab_data = json.load(multiple_names)
-        print("Done!")
-# If the file isn't found, create it
-except Exception:
-    print("File %s not found - creating..." % (BAB_FILE))
-    fetch_bab_names(SCRYFALL_BAB_URL)
-    with open(BAB_FILE, "w") as multiple_names:
-        json.dump(scryfall_bab_data, multiple_names)
-    print("Done!")
-
-
-# Get our input
-GUI = False
-if len(sys.argv) < 2:
-    GUI = True
-    FILE = filedialog.askopenfilename(
-        title="Select your TCGPlayer app export file",
-        filetypes=[("TCGPlayer exports", ".csv"), ("All files", "*.*")],
-    )
-    if len(FILE) == 0:
-        messagebox.showerror(
-            title="Input file not provided",
-            message="You must pass the TCGPlayer csv export file to this program.",
-        )
-        sys.exit()
-else:
-    FILE = sys.argv[1]
-
-skipcolumns = [
+SKIP_COLUMNS = [
     "Simple Name",
     "Set Code",
     "Rarity",
@@ -190,155 +33,244 @@ skipcolumns = [
     "Price",
     "Price Each",
 ]
-outputFile = "deckbox_import.csv"
+OUTPUT_FILE = "deckbox_import.csv"
 
-configParser = configparser.ConfigParser(delimiters="=")
-configParser.read(os.path.join(getPathPrefix(), "replacements.config"))
+# Global Data
+scryfall_data = {}
+scryfall_bab_data = {}
 
-with open(FILE, newline="") as tcgcsvfile, open(
-    outputFile, "w", newline=""
-) as deckboxcsvfile:
+# So as not to hammer scryfall with unnecessary requests, we check to see if our cached data is older than a week.
+now = time.time()
+last_week = now - 60 * 60 * 24 * 7
 
-    try:
-        csv.Sniffer().sniff(tcgcsvfile.read(4096), delimiters=",")
-        tcgcsvfile.seek(0)
-    except:
-        if GUI:
-            messagebox.showerror(
-                title="Invalid input file",
-                message="The file selected does not appear to be a valid CSV file.",
-            )
-        else:
-            print("The file passed does not appear to be a valid CSV file.")
-        sys.exit()
 
-    csvreader = csv.DictReader(tcgcsvfile)
+def get_path_prefix() -> str:
+    """
+    Returns the path where all files except the input csv are located. This includes the replacements.config, as well as
+    the output deckbox_import.csv. This is a holdover from when this was packaged as an executable. In that, it needed
+    a different variable to be told to look inside the bundled program. Now it will always return the current directory.
+    :rtype: str
+    :return: the current directory the script is run from.
+    """
+    prefix: str = os.path.abspath(".")
+    return prefix
 
-    # Adjust column names
-    headerstcg = csvreader.fieldnames
-    for index, header in enumerate(headerstcg):
-        if header.lower() in configParser["COLUMNS"].keys():
-            headerstcg[index] = configParser["COLUMNS"][header.lower()]
 
-    # Unnecessary Columns: Simple Name,Set Code,Printing,Rarity,Product ID,SKU,Price,Price Each.
-    headersdeckbox = [x for x in headerstcg if x not in skipcolumns]
+# Utility function to replace strings in the csv from the replacements.config file.
+def replace_strings(dictionary, config_parser, replacement_section, column_name):
+    if dictionary[column_name].lower() in config_parser[replacement_section].keys():
+        dictionary[column_name] = config_parser[replacement_section][dictionary[column_name].lower()]
 
-    csvwriter = csv.DictWriter(
-        deckboxcsvfile, quoting=csv.QUOTE_ALL, fieldnames=headersdeckbox
+
+def scryfall_data_func(raw_data: dict):
+    scryfall_data[raw_data["card_faces"][0]["name"]] = raw_data["name"]
+
+
+def scryfall_bab_data_func(raw_data: dict):
+    scryfall_bab_data[raw_data["name"]] = raw_data["set_name"]
+
+
+# Queries scryfall to build a list of cards that have multiple names.
+def fetch_scryfall_data(uri, mapper, page=1):
+    print(
+        "Begin: Download '%s', page %s of results" % (urllib.parse.unquote(uri), page)
     )
-    csvwriter.writeheader()
-    for row in csvreader:
-        skip_scryfall_names = False
+    try:
+        with requests.get(uri) as scryfall_response:
+            tmp_scryfall_data = scryfall_response.json()
 
-        # Don't bother with columns that are going to be ignored anyways
-        for skippable in skipcolumns:
-            row.pop(skippable, "")
+            for x in tmp_scryfall_data["data"]:
+                mapper(x)
+            if "next_page" in tmp_scryfall_data:
+                fetch_scryfall_data(tmp_scryfall_data["next_page"], mapper, page + 1)
+    except requests.exceptions.JSONDecodeError:
+        print("Exception: Was unable to download %s, page %s of results" % (uri, page))
+        traceback.print_exc()
 
-        # Map the printing column to the Foil column
-        if row["Foil"] == "Normal":
-            row["Foil"] = ""
 
-        # Map Card Condition
-        replace_strings(row, "CONDITIONS", "Condition")
+def load_scryfall_data(filename: str, query_url: str, mapper_function, data_dict: dict):
+    try:
+        file_last_updated: float = os.path.getmtime(filename)
+        print(
+            "%s last modified: %s"
+            % (filename, time.ctime(file_last_updated))
+        )
 
-        # Map Chinese Languages
-        replace_strings(row, "LANGUAGES", "Language")
+        # Refresh the multiple names file if it's a week old, else use the cached version
+        if file_last_updated < last_week:
+            print("File %s is stale - updating..." % filename)
+            fetch_scryfall_data(query_url, mapper_function)
+            with open(filename, "w") as file:
+                json.dump(data_dict, file)
+            print("Done!")
+        else:
+            print("Using existing %s file..." % filename)
+            with open(filename) as file:
+                data_dict.update(json.load(file))
+            print("Done!")
+    # If the file isn't found, create it
+    except OSError:
+        print("File %s not found - creating..." % filename)
+        fetch_scryfall_data(query_url, mapper_function)
+        with open(filename, "w") as file:
+            json.dump(data_dict, file)
+        print("Done!")
 
-        ####################################################################
-        # Map Specific Card Conditions
-        ####################################################################
 
-        # For BFZ lands...there's no differentiator from the full arts and the non full arts.
-        row["Name"] = row["Name"].replace(" - Full Art", "")
-        
-        # War of the Spark Alternate Arts handled differently
-        if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
-            row["Edition"] = "War of the Spark Japanese Alternate Art"
-            row["Name"] = row["Name"].replace(" (JP Alternate Art)", "")
+def process_row(row, writer, config_parser):
+    skip_scryfall_names = False
 
-        # Buy a Box Promos worked a little differently with Ixalan
-        if row["Name"] in ixalan_bab and row["Edition"] == "Buy-A-Box Promos":
-            row["Edition"] = "Black Friday Treasure Chest Promos"
-            skip_scryfall_names = True
-            
-        # TODO Merge this with above
-        if row["Name"] in scryfall_bab_data and row["Edition"] == "Buy-A-Box Promos":
-            if "Promos" in scryfall_bab_data[row["Name"]]:
-                row["Edition"] = "Media Inserts"
-            else:
-                row["Edition"] = scryfall_bab_data[row["Name"]]
+    # Don't bother with columns that are going to be ignored
+    skipped_column: str
+    for skipped_column in SKIP_COLUMNS:
+        row.pop(skipped_column, "")
 
-        # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
-        # on deckbox, while tcgplayer differentiates by name appending '(No PW Symbol)'
-        if (
+    # Map the printing column to the Foil column
+    if row["Foil"] == "Normal":
+        row["Foil"] = ""
+
+    # Map Card Condition
+    replace_strings(row, config_parser, "CONDITIONS", "Condition")
+
+    # Map Chinese Languages
+    replace_strings(row, config_parser, "LANGUAGES", "Language")
+
+    ####################################################################
+    # Map Specific Card Conditions
+    ####################################################################
+
+    # For BFZ lands...there's no differentiator from the full arts and the non-full arts.
+    row["Name"] = row["Name"].replace(" - Full Art", "")
+
+    # War of the Spark Alternate Arts handled differently
+    if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
+        row["Edition"] = "War of the Spark Japanese Alternate Art"
+        row["Name"] = row["Name"].replace(" (JP Alternate Art)", "")
+
+    if row["Name"] in scryfall_bab_data and row["Edition"] == "Buy-A-Box Promos":
+        if "Promos" in scryfall_bab_data[row["Name"]]:
+            row["Edition"] = "Media Inserts"
+        else:
+            row["Edition"] = scryfall_bab_data[row["Name"]]
+
+    # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
+    # on deckbox, while tcg player differentiates by name appending '(No PW Symbol)'
+    if (
             "(No PW Symbol)" in row["Name"]
             and row["Edition"] == "Mystery Booster: Convention Edition Exclusives"
-        ):
-            row["Edition"] = "Mystery Booster Playtest Cards 2021"
+    ):
+        row["Edition"] = "Mystery Booster Playtest Cards 2021"
 
-        ####################################################################
-        # Handle General Card Conversions
-        ####################################################################
+    ####################################################################
+    # Handle General Card Conversions
+    ####################################################################
 
-        # Remove all Parentheses at the end of cards
-        row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
-        replace_strings(row, "NAMES", "Name")
-        
-        # We need to do a little extra work on dual faced cards, because deckbox is inconsistent with whether it refers to cards by both names or just the front face.
-        if row["Name"] in scryfall_data:
-            deckbox_request_url = DECKBOX_URL + urllib.parse.quote(
-                scryfall_data[row["Name"]]
-            )
-            with requests.get(deckbox_request_url) as deckbox_response:
+    # TODO split collector number on -, TCGPlayer started prefixing list cards with a set code
+    # TODO The List Reprints -> The List
+    # TODO remove "- Thick Stock"
 
-                # If we are not redirected to a new page, then we should only use the front face name
-                deckbox_response_url_parts = urllib.parse.urlparse(deckbox_response.url)
-                deckbox_response_url = deckbox_response_url_parts._replace(fragment="")._replace(query="").geturl()
-                
-                if deckbox_request_url == deckbox_response_url or deckbox_request_url.replace("//", "/") == deckbox_response_url.replace("//", "/"):
-                    print(
-                        "Dual name for '%s' found on deckbox, the dual name will be used for the import."
-                        % (scryfall_data[row["Name"]])
-                    )
-                else:
-                    print(
-                        "Dual name not found for '%s' on deckbox, front face name '%s' will be used."
-                        % (scryfall_data[row["Name"]], row["Name"])
-                    )
-                    skip_scryfall_names = True
-            if skip_scryfall_names == False:
-                row["Name"] = scryfall_data[row["Name"]]
-                
-        # Fix edition for Buy-A-Box Promos
-        if row["Name"] in bab_mapping and row["Edition"] == "Buy-A-Box Promos":
-            row["Edition"] = bab_mapping[row["Name"]]
-            
-        # Move commander from edition to the end
-        if "Commander: " in row["Edition"]:
-            row["Edition"] = re.sub(r"Commander: (.*)$", r"\1 Commander", row["Edition"])
-        
-        # Remove Universes Beyond modifier
-        if "Universes Beyond: " in row["Edition"]:
-            row["Edition"] = re.sub(r"Universes Beyond: ", "", row["Edition"])
+    # Remove all Parentheses at the end of cards
+    row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
+    replace_strings(row, config_parser, "NAMES", "Name")
 
-        # remove weird symbols from card numbers
-        row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])
-        
-        # move Promo Pack to the end if it's not in replacements.config (some old ones actually do have the prefix
-        if "Promo Pack: " in row["Edition"] and not row["Edition"] in configParser["EDITONS"].keys():
-            row["Edition"] = re.sub(r"Promo Pack: (.*)$", r"\1 Promo Pack", row["Edition"])   
+    # We need to do a little extra work on dual faced cards, because deckbox is inconsistent with whether it
+    # refers to cards by both names or just the front face.
+    if row["Name"] in scryfall_data:
+        deckbox_request_url = DECKBOX_URL + urllib.parse.quote(
+            scryfall_data[row["Name"]]
+        )
+        with requests.get(deckbox_request_url) as deckbox_response:
 
-        # Map Specific Edition Names
-        replace_strings(row, "EDITONS", "Edition")     
+            # If we are not redirected to a new page, then we should only use the front face name
+            deckbox_response_url_parts = urllib.parse.urlparse(deckbox_response.url)
+            deckbox_response_url = deckbox_response_url_parts._replace(fragment="")._replace(query="").geturl()
 
-        # write the converted output
-        csvwriter.writerow(row)
+            if deckbox_request_url == deckbox_response_url \
+                    or deckbox_request_url.replace("//", "/") == deckbox_response_url.replace("//", "/"):
+                print(
+                    "Dual name for '%s' found on deckbox, the dual name will be used for the import."
+                    % (scryfall_data[row["Name"]])
+                )
+            else:
+                print(
+                    "Dual name not found for '%s' on deckbox, front face name '%s' will be used."
+                    % (scryfall_data[row["Name"]], row["Name"])
+                )
+                skip_scryfall_names = True
+        if not skip_scryfall_names:
+            row["Name"] = scryfall_data[row["Name"]]
 
-# All Done!
-successMsg = "Your import file for deckbox.org is available here: %s" % os.path.abspath(
-    outputFile
-)
-if GUI:
-    messagebox.showinfo(title="Conversion completed successfully!", message=successMsg)
-else:
-    print(successMsg)
+    # Move commander from edition to the end
+    if "Commander: " in row["Edition"]:
+        row["Edition"] = re.sub(r"Commander: (.*)$", r"\1 Commander", row["Edition"])
+
+    # Remove Universes Beyond modifier
+    if "Universes Beyond: " in row["Edition"]:
+        row["Edition"] = re.sub(r"Universes Beyond: ", "", row["Edition"])
+
+    # remove weird symbols from card numbers
+    row["Card Number"] = re.sub(r"[*★]", "", row["Card Number"])
+
+    # move Promo Pack to the end if it's not in replacements.config (some old ones actually do have the prefix
+    if "Promo Pack: " in row["Edition"] and not row["Edition"] in config_parser["EDITIONS"].keys():
+        row["Edition"] = re.sub(r"Promo Pack: (.*)$", r"\1 Promo Pack", row["Edition"])
+
+    # Map Specific Edition Names
+    replace_strings(row, config_parser, "EDITIONS", "Edition")
+
+    # write the converted output
+    writer.writerow(row)
+
+
+def validate_input_csv(tcg_csv_file: TextIO):
+    try:
+        csv.Sniffer().sniff(tcg_csv_file.read(4096), delimiters=",")
+        tcg_csv_file.seek(0)
+    except UnicodeDecodeError:
+        print("The file passed does not appear to be a valid CSV file.")
+        sys.exit()
+
+
+def convert():
+    load_scryfall_data(MULTI_NAMES_FILE, SCRYFALL_DFC_URL, scryfall_data_func, scryfall_data)
+    load_scryfall_data(BAB_FILE, SCRYFALL_BAB_URL, scryfall_bab_data_func, scryfall_bab_data)
+
+    # Get our input
+    input_file = sys.argv[1]
+
+    config_parser = configparser.ConfigParser(delimiters="=")
+    config_parser.read(os.path.join(get_path_prefix(), "replacements.config"))
+
+    with open(input_file, newline="") as tcg_csv_file, open(
+            OUTPUT_FILE, "w", newline=""
+    ) as deckbox_csv_file:
+        tcg_csv_file: TextIO
+        deckbox_csv_file: TextIO
+        validate_input_csv(tcg_csv_file=tcg_csv_file)
+
+        csvreader: DictReader = csv.DictReader(tcg_csv_file)
+
+        # Adjust column names
+        tcg_headers = csvreader.fieldnames
+        for index, header in enumerate(tcg_headers):
+            if header.lower() in config_parser["COLUMNS"].keys():
+                tcg_headers[index] = config_parser["COLUMNS"][header.lower()]
+
+        # Unnecessary Columns: Simple Name,Set Code,Printing,Rarity,Product ID,SKU,Price,Price Each.
+        deckbox_headers: list[str] = [x for x in tcg_headers if x not in SKIP_COLUMNS]
+
+        csvwriter: DictWriter = csv.DictWriter(
+            deckbox_csv_file, quoting=csv.QUOTE_ALL, fieldnames=deckbox_headers
+        )
+        csvwriter.writeheader()
+        csv_row: dict
+        for csv_row in csvreader:
+            process_row(row=csv_row, writer=csvwriter, config_parser=config_parser)
+    # All Done!
+    success_msg = "Your import file for deckbox.org is available here: %s" % os.path.abspath(
+        OUTPUT_FILE
+    )
+    print(success_msg)
+
+
+convert()

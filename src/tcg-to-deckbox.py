@@ -142,16 +142,11 @@ def process_row(row, writer, config_parser):
     # For BFZ lands...there's no differentiator from the full arts and the non-full arts.
     row["Name"] = row["Name"].replace(" - Full Art", "")
 
+    # Handle Special cases of Parentheses
     # War of the Spark Alternate Arts handled differently
     if "(JP Alternate Art)" in row["Name"] and row["Edition"] == "War of the Spark":
         row["Edition"] = "War of the Spark Japanese Alternate Art"
         row["Name"] = row["Name"].replace(" (JP Alternate Art)", "")
-
-    if row["Name"] in scryfall_bab_data and row["Edition"] == "Buy-A-Box Promos":
-        if "Promos" in scryfall_bab_data[row["Name"]]:
-            row["Edition"] = "Media Inserts"
-        else:
-            row["Edition"] = scryfall_bab_data[row["Name"]]
 
     # Handle Mystery Booster Test Cards, the 2021 release differentiates by Edition
     # on deckbox, while tcg player differentiates by name appending '(No PW Symbol)'
@@ -160,6 +155,15 @@ def process_row(row, writer, config_parser):
             and row["Edition"] == "Mystery Booster: Convention Edition Exclusives"
     ):
         row["Edition"] = "Mystery Booster Playtest Cards 2021"
+        
+    # Remove all Parentheses still at the end of cards
+    row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
+
+    if row["Name"] in scryfall_bab_data and row["Edition"] == "Buy-A-Box Promos":
+        if "Promos" in scryfall_bab_data[row["Name"]]:
+            row["Edition"] = "Media Inserts"
+        else:
+            row["Edition"] = scryfall_bab_data[row["Name"]]
 
     ####################################################################
     # Handle General Card Conversions
@@ -169,8 +173,6 @@ def process_row(row, writer, config_parser):
     # TODO The List Reprints -> The List
     # TODO remove "- Thick Stock"
 
-    # Remove all Parentheses at the end of cards
-    row["Name"] = re.sub(r" \(.*\)", "", row["Name"])
     replace_strings(row, config_parser, "NAMES", "Name")
 
     # We need to do a little extra work on dual faced cards, because deckbox is inconsistent with whether it

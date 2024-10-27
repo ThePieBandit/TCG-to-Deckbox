@@ -21,7 +21,7 @@ replacements.config file, which lists a mapping of translated values .
 
 To use the CLI, provide the path to your TCGplayer csv file:
 
-    python3 tcg-to-deckbox.py ~/bin/sample_input.csv
+    python3 tcg-to-deckbox.py "~/bin/sample_input.csv"
 
 It will give you a new csv, named `deckbox_import.csv` in the directory from which the script was run.
 
